@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Happy New Year</title>
+    <link href="https://fonts.googleapis.com/css2?family=Pacifico&display=swap" rel="stylesheet">
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background: #0e1247;
+            display: flex;
+            justify-content: center;
+            align-items: flex-end; /* Align items to the bottom */
+            height: 100vh;
+            color: #fff;
+            font-family: 'Arial', sans-serif;
+        }
+        .message {
+            font-size: 3em;
+            text-align: center;
+            height: 200px;
+            opacity: 0;
+            margin-bottom: 50px; /* Add margin to lower the message */
+            animation: fadeIn 3s forwards, moveUp 3s forwards;
+            position: absolute;
+            z-index: 10; /* Ensure the message is above all patterns */
+            color: #f24cdc;
+            font-family: 'Pacifico', cursive; /* Change the font */
+        }
+        .sub-message {
+            font-size: 1.5em;
+            text-align: center;
+            opacity: 0;
+            margin-bottom: 130px; /* Add margin to lower the sub-message */
+            animation: fadeIn 3s forwards, moveUp 3s forwards;
+            position: absolute;
+            color: #f6def3;
+            z-index: 10; /* Ensure the sub-message is above all patterns */
+            font-family: 'Gill Sans'; /* Change the font */
+        }
+        @keyframes fadeIn {
+            0% { opacity: 0; }
+            100% { opacity: 1; }
+        }
+        @keyframes moveUp {
+            0% { transform: translateY(50px); }
+            100% { transform: translateY(0); }
+        }
+        .fireworks {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 1; /* Ensure the canvas is below the message */
+        }
+    </style>
+</head>
+<body>
+    <div class="message">Happy New Year, Leah!</div>
+    <div class="sub-message">Wish you nothing but pure happiness and endless love.</div>
+    <canvas class="fireworks"></canvas>
+    <script>
+        const canvas = document.querySelector('.fireworks');
+        const ctx = canvas.getContext('2d');
+        const fireworks = [];
+        const particles = [];
+        const hearts = [];
+        const heartColor = '#87CEEB'; // Sky blue color
+        let hue = 120;
+        let limiterTotal = 5;
+        let limiterTick = 0;
+        let timerTotal = 40; // Reduced timer to increase frequency of fireworks
+        let timerTick = 0;
+        let mousedown = false;
+        let mx, my;
+
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+
+        function random(min, max) {
+            return Math.random() * (max - min) + min;
+        }
+
+        function randomColor() {
+            return `hsl(${random(0, 360)}, 100%, 50%)`;
+        }
+
+        function calculateDistance(p1x, p1y, p2x, p2y) {
+            const xDistance = p1x - p2x;
+            const yDistance = p1y - p2y;
+            return Math.sqrt(Math.pow(xDistance, 2) + Math.pow(yDistance, 2));
+        }
+
+        function Firework(sx, sy, tx, ty) {
+            this.x = sx;
+            this.y = sy;
+            this.sx = sx;
+            this.sy = sy;
+            this.tx = tx;
+            this.ty = ty;
+            this.distanceToTarget = calculateDistance(sx, sy, tx, ty);
+            this.distanceTraveled = 0;
+            this.coordinates = [];
+            this.coordinateCount = 3;
+            while (this.coordinateCount--) {
+                this.coordinates.push([this.x, this.y]);
+            }
+            this.angle = Math.atan2(ty - sy, tx - sx);
+            this.speed = 2;
+            this.acceleration = 1.05;
+            this.color = randomColor();
+            this.targetRadius = 1;
+        }
+
+        Firework.prototype.update = function(index) {
+            this.coordinates.pop();
+            this.coordinates.unshift([this.x, this.y]);
+            if (this.targetRadius < 8) {
+                this.targetRadius += 0.3;
+            } else {
+                this.targetRadius = 1;
+            }
+            this.speed *= this.acceleration;
+            const vx = Math.cos(this.angle) * this.speed;
+            const vy = Math.sin(this.angle) * this.speed;
+            this.distanceTraveled = calculateDistance(this.sx, this.sy, this.x + vx, this.y + vy);
+            if (this.distanceTraveled >= this.distanceToTarget) {
+                createParticles(this.tx, this.ty);
+                fireworks.splice(index, 1);
+            } else {
+                this.x += vx;
+                this.y += vy;
+            }
+        };
+
+        Firework.prototype.draw = function() {
+            ctx.beginPath();
+            ctx.moveTo(this.coordinates[this.coordinates.length - 1][0], this.coordinates[this.coordinates.length - 1][1]);
+            ctx.lineTo(this.x, this.y);
+            ctx.strokeStyle = this.color;
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.arc(this.tx, this.ty, this.targetRadius, 0, Math.PI * 2);
+            ctx.stroke();
+        };
+
+        function Particle(x, y) {
+            this.x = x;
+            this.y = y;
+            this.coordinates = [];
+            this.coordinateCount = 5;
+            while (this.coordinateCount--) {
+                this.coordinates.push([this.x, this.y]);
+            }
+            this.angle = random(0, Math.PI * 2);
+            this.speed = random(1, 10);
+            this.friction = 0.95;
+            this.gravity = 1;
+            this.color = randomColor();
+            this.alpha = 1;
+            this.decay = random(0.015, 0.03);
+        }
+
+        Particle.prototype.update = function(index) {
+            this.coordinates.pop();
+            this.coordinates.unshift([this.x, this.y]);
+            this.speed *= this.friction;
+            this.x += Math.cos(this.angle) * this.speed;
+            this.y += Math.sin(this.angle) * this.speed + this.gravity;
+            this.alpha -= this.decay;
+            if (this.alpha <= this.decay) {
+                particles.splice(index, 1);
+            }
+        };
+
+        Particle.prototype.draw = function() {
+            ctx.save();
+            ctx.translate(this.x, this.y);
+            ctx.rotate(this.angle);
+            ctx.beginPath();
+            ctx.moveTo(0, -5);
+            ctx.lineTo(2, -2);
+            ctx.lineTo(5, 0);
+            ctx.lineTo(2, 2);
+            ctx.lineTo(0, 5);
+            ctx.lineTo(-2, 2);
+            ctx.lineTo(-5, 0);
+            ctx.lineTo(-2, -2);
+            ctx.closePath();
+            ctx.fillStyle = this.color;
+            ctx.globalAlpha = this.alpha;
+            ctx.fill();
+            ctx.restore();
+        };
+
+        function createParticles(x, y) {
+            let particleCount = 30;
+            while (particleCount--) {
+                particles.push(new Particle(x, y));
+            }
+        }
+
+        function Heart(x, y, size) {
+            this.x = x;
+            this.y = y;
+            this.size = size;
+            this.color = heartColor;
+            this.alpha = 1;
+        }
+
+        Heart.prototype.draw = function() {
+            ctx.save();
+            ctx.translate(this.x, this.y);
+            ctx.scale(this.size, this.size);
+            ctx.beginPath();
+            ctx.moveTo(0, -5);
+            ctx.bezierCurveTo(5, -15, 25, -15, 25, 5);
+            ctx.bezierCurveTo(25, 25, 0, 35, 0, 45);
+            ctx.bezierCurveTo(0, 35, -25, 25, -25, 5);
+            ctx.bezierCurveTo(-25, -15, -5, -15, 0, -5);
+            ctx.closePath();
+            ctx.fillStyle = this.color;
+            ctx.globalAlpha = this.alpha;
+            ctx.fill();
+            ctx.restore();
+        };
+
+        function createHearts() {
+            for (let i = 0; i < 100; i++) {
+                const x = random(0, canvas.width);
+                const y = random(0, canvas.height);
+                const size = random(0.1, 0.5);
+                hearts.push(new Heart(x, y, size));
+            }
+        }
+
+        function loop() {
+            requestAnimationFrame(loop);
+            hue += 0.5;
+            ctx.globalCompositeOperation = 'destination-out';
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.globalCompositeOperation = 'lighter';
+            let i = fireworks.length;
+            while (i--) {
+                fireworks[i].draw();
+                fireworks[i].update(i);
+            }
+            let j = particles.length;
+            while (j--) {
+                particles[j].draw();
+                particles[j].update(j);
+            }
+            let k = hearts.length;
+            while (k--) {
+                hearts[k].draw();
+            }
+            if (timerTick >= timerTotal) {
+                if (!mousedown) {
+                    // Increase the number of fireworks
+                    for (let l = 0; l < 100; l++) {
+                        fireworks.push(new Firework(canvas.width / 2, canvas.height, random(0, canvas.width), random(0, canvas.height / 2)));
+                    }
+                    timerTick = 0;
+                }
+            } else {
+                timerTick++;
+            }
+            if (limiterTick >= limiterTotal) {
+                if (mousedown) {
+                    // Increase the number of fireworks on mouse click
+                    for (let l = 0; l < 100; l++) {
+                        fireworks.push(new Firework(canvas.width / 2, canvas.height, mx, my));
+                    }
+                    limiterTick = 0;
+                }
+            } else {
+                limiterTick++;
+            }
+        }
+
+        canvas.addEventListener('mousemove', function(e) {
+            mx = e.pageX - canvas.offsetLeft;
+            my = e.pageY - canvas.offsetTop;
+        });
+
+        canvas.addEventListener('mousedown', function(e) {
+            e.preventDefault();
+            mousedown = true;
+        });
+
+        canvas.addEventListener('mouseup', function(e) {
+            e.preventDefault();
+            mousedown = false;
+        });
+
+        window.onload = function() {
+            createHearts();
+            loop();
+        };
+    </script>
+</body>
+</html>
